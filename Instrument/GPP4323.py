@@ -27,7 +27,11 @@ class Gpp4323(ScpiInstrument):
     """GWINSTEK GPP-4323 四通道可编程直流电源"""
 
     def __init__(self, com_port: str, baud_rate: int = 9600, timeout_ms: int = 3000):
-        super().__init__(f'ASRL{com_port}::INSTR', timeout_ms)
+        # pyvisa-py 在 Windows 上会自动给资源串加 COM 前缀
+        # （ASRL3::INSTR → COM3），所以资源串只写端口号数字。
+        # 这里把 'COM3' 归一化为 '3'，传 'COM3' 或 '3' 均可。
+        port_num = com_port.upper().replace('COM', '')
+        super().__init__(f'ASRL{port_num}::INSTR', timeout_ms)
         self._instr.baud_rate = baud_rate
 
         # 四个通道共享同一串口连接，只差在通道号后缀
