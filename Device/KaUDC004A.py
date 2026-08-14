@@ -214,15 +214,15 @@ class KaUDC004A:
     # ============================================================
 
     def set_dac(self, channel: int, i_code: int, q_code: int) -> None:
-        """DAC 校准码设置（FCode F1）
+        """I/Q 校准码写入（FCode F1）——本振泄漏抑制校准
 
-        channel: 0~3 对应 TxBand1~4（0=Band1, 1=Band2, 2=Band3, 3=Band4）
-        i_code / q_code: I / Q 路校准码 0~4096
+        channel: 0~3 对应 TxBand1~4，同时对应上变频本振：
+            0→26550, 1→27400, 2→28050, 3→29050 MHz
+        i_code / q_code: I / Q 路校准码 0~4096（调节使 LO 峰值接近底噪）
 
-        【实测固件副作用——重要】0xF1 命令会把上变频本振重置为默认值
-        29050MHz（MATLAB 与 Python 发送帧逐字节一致，行为相同，属模块
-        固件固有行为）。使用本方法后必须重新 set_lo('up', ...)，
-        或在流程中把 DAC 设置放在本振设置之前。
+        【固件行为】写入校准码的同时，固件会把上变频本振切换到
+        channel 对应频段（便于直接在校准条件下观察频谱）。
+        校准值存于模块 Flash，正式测试时 set_lo 切频段即自动生效。
         """
         body = pack_bits([self.FC_DAC, channel, i_code, q_code], [8, 8, 16, 16])
         self._exchange(self.FC_DAC, body)

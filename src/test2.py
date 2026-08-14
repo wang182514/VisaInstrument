@@ -30,9 +30,9 @@ dut = KaUDC004A(COM_PORT)
 run('版本号      ', dut.version)
 run('温度/电压   ', dut.temperature)
 
-# ---- DAC 设置 ----
-# 注意：实测 0xF1 会把上变频本振重置为默认 29050（模块固件行为，
-# MATLAB 同样触发）。所以 DAC 必须放在本振设置之前，本振最后设置。
+# ---- DAC 校准设置 ----
+# 0xF1 写校准码时会把上变频本振切到 channel 对应频段（3→29050），
+# 所以 DAC 设置放在本振设置之前，最后由 set_lo 确定测试频段。
 run('DAC校准设置 ', lambda: dut.set_dac(3, 2245, 2210))
 
 # ---- 衰减 / 增益 ----
@@ -52,6 +52,6 @@ run('读Flash     ', dut.read_flash)  # 此时 Flash 应为本振最终值
 # ---- 以下两项默认不执行，确认需要时取消注释 ----
 # run('写Flash     ', dut.write_flash)  # ← 会把当前配置固化进 Flash，慎用
 # run('复位       ', dut.reset)         # ← 复位变频分机
-print(dut.query_lo())
+
 dut.close()
 print('测试结束，串口已关闭')
