@@ -20,6 +20,9 @@ env/
 .vscode/
 *.swp
 
+# ---- 本地工具元数据 ----
+.reasonix/
+
 # ---- 运行输出 ----
 output/
 logs/

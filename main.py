@@ -1,3 +1,5 @@
+import time
+
 import pyvisa
 from Instrument import *
 # 1. 创建连接管理器
@@ -10,5 +12,4 @@ sa = N9020A('192.168.1.2')
 sa.set_mode_sa()
 print(sa.sa_marker_peak())
 print(f"error: {sa.check_error()}") #error: +0,"No error"
-sa.set_mode_nf()
 sa.close()
