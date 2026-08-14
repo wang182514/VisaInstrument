@@ -131,10 +131,10 @@ class KaUDC004A:
         上变频可选: 26550 / 27400 / 28050 / 29050 MHz
         返回: 仪器确认的本振频率 (MHz)
 
-        【实测固件行为】0x0E（下变频）会把当时的下变频+上变频本振
-        一起固化进 Flash；0x12（上变频）只改运行值、不写 Flash。
-        因此想让上变频本振进 Flash：先 set_lo('up', X) 再 set_lo('down', Y)，
-        或两个都设完后调 write_flash()。
+        【固件行为】0x0E/0x12 设置本振时会同步固化到 Flash（0x0E 固化
+        下变频字段、0x12 固化上变频字段；实测 0x12 固化需约 1 秒完成，
+        连续快速执行后续命令可能读到旧值）。注意 0xF1（DAC 校准）会
+        把上变频本振切到 DACch 对应频段，见 set_dac()。
         """
         if direction == 'down':
             fcode = self.FC_LO_DOWN
