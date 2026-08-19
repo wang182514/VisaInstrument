@@ -41,6 +41,25 @@ class N9020A(ScpiInstrument):
         """切到 PN 模式（相位噪声）"""
         self.write(':INST PNOISE')
 
+    # ---- 系统类（一档补全）----
+
+    def preset(self) -> None:
+        """复位仪器到出厂默认状态（*RST）"""
+        self.write('*RST')
+
+    def clear_status(self) -> None:
+        """清空状态寄存器和错误队列（*CLS）"""
+        self.write('*CLS')
+
+    def save_state(self, name: str) -> None:
+        """保存当前仪器状态到内部存储（:MMEM:STOR:STAT）"""
+        self.write(f':MMEM:STOR:STAT "{name}"')
+        self.query('*OPC?')
+
+    def query_opc(self) -> str:
+        """阻塞等待仪器所有待处理操作完成（*OPC?），返回 '+1'"""
+        return self.query('*OPC?')
+
     # ---- 通用 ----
 
     def load_state(self, name: str) -> None:
@@ -97,6 +116,53 @@ class N9020A(ScpiInstrument):
         """设置参考电平偏移 (dB)，用于射频线缆损耗补偿"""
         self.write(f':DISP:WIND1:TRAC:Y:RLEV:OFFS {offset_db:.2f}')
 
+    # ---- SA 模式 — 独立 setter（一档补全）----
+    # sa_configure_mhz 是一次配齐；下面这些是流程中需要细调单参数时用的
+
+    def sa_set_span_mhz(self, span_mhz: float) -> None:
+        """单独设置 SA 扫描跨度 (MHz)"""
+        self.write(f':SENS:FREQ:SPAN {span_mhz:.3f}MHz')
+
+    def sa_set_rbw_khz(self, rbw_khz: float) -> None:
+        """单独设置分辨率带宽 RBW (kHz)"""
+        self.write(f':SENS:BAND:RES {rbw_khz:.0f}KHz')
+
+    def sa_set_vbw_khz(self, vbw_khz: float) -> None:
+        """单独设置视频带宽 VBW (kHz)"""
+        self.write(f':SENS:BAND:VID {vbw_khz:.0f}KHz')
+
+    def sa_set_ref_level_dbm(self, level_dbm: float) -> None:
+        """单独设置参考电平 (dBm)"""
+        self.write(f':DISP:WIND:TRAC:Y:RLEV {level_dbm:.0f}dBm')
+
+    def sa_set_atten_db(self, atten_db: float) -> None:
+        """单独设置 RF 衰减 (dB)"""
+        self.write(f':SENS:POW:RF:ATT {atten_db:.1f}')
+
+    def sa_set_preamp(self, on: bool) -> None:
+        """开关前置放大器"""
+        self.write(f':POW:GAIN {"ON" if on else "OFF"}')
+
+    def sa_set_sweep_time_sec(self, sec: float) -> None:
+        """单独设置扫描时间 (秒)"""
+        self.write(f':SENS:SWE:TIME {sec:.3f}')
+
+    def sa_set_sweep_count(self, n: int) -> None:
+        """单独设置扫描次数（ACPR 模板常用，>1 时仪器自动平均）"""
+        self.write(f':SENS:SWE:COUN {n}')
+
+    def sa_set_detector(self, mode: str) -> None:
+        """设置检波器：POS/NEG/AVER/SAMP"""
+        self.write(f':DET:TRAC1 {mode}')
+
+    def sa_set_trigger_source(self, source: str) -> None:
+        """设置触发源：IMM(自由)/VIDeo/EXT/IF"""
+        self.write(f':TRIG:SOUR {source}')
+
+    def sa_set_cf_step(self, freq_hz: float) -> None:
+        """设置中心频率步进大小（Hz）— 与键盘上箭头增减频率对应"""
+        self.write(f':CALC:MARK:STEP {freq_hz:.0f}')
+
     def sa_marker_peak(self):
         """峰值搜索：返回 (频率 Hz, 幅度 dBm)"""
         self.write(':CALC:MARK1:STAT ON')
@@ -124,6 +190,51 @@ class N9020A(ScpiInstrument):
         """读取当前迹线 Y 轴数据（返回 float 列表）"""
         resp = self.query(':TRAC:DATA? TRACE1')
         return [float(x) for x in resp.split(',')]
+
+    # ---- SA 模式 — Marker 高级操作（二档补全）----
+
+    def marker_on(self, marker: int) -> None:
+        """打开指定 marker (1~12)"""
+        self.write(f':CALC:MARK{marker}:STAT ON')
+
+    def marker_off(self, marker: int) -> None:
+        """关闭指定 marker"""
+        self.write(f':CALC:MARK{marker}:STAT OFF')
+
+    def set_marker_freq_hz(self, marker: int, freq_hz: float) -> None:
+        """把指定 marker 设到给定频率 (Hz)"""
+        self.write(f':CALC:MARK{marker}:X {freq_hz:.0f}')
+
+    def read_marker_x(self, marker: int) -> float:
+        """读取指定 marker 的 X 轴（频率 Hz）"""
+        return self.query_number(f':CALC:MARK{marker}:X?')
+
+    def read_marker_y(self, marker: int) -> float:
+        """读取指定 marker 的 Y 轴（幅度 dBm）"""
+        return self.query_number(f':CALC:MARK{marker}:Y?')
+
+    def peak_search_next(self) -> float:
+        """峰值搜索下一个最高点，返回 Y 轴 (dBm)。谐波测量必用"""
+        self.write(':CALC:MARK:MAX:NEXT')
+        time.sleep(0.1)
+        return self.query_number(':CALC:MARK1:Y?')
+
+    def delta_marker_on(self, marker: int, ref_marker: int) -> None:
+        """把指定 marker 设为与参考 marker 的差值"""
+        self.write(f':CALC:DELT{marker}:STAT ON')
+        self.write(f':CALC:DELT{marker}:MARK {ref_marker}')
+
+    def set_delta_marker_freq_hz(self, marker: int, freq_hz: float) -> None:
+        """设置 delta marker 的频率（相对参考 marker 的偏移）"""
+        self.write(f':CALC:DELT{marker}:X {freq_hz:.0f}')
+
+    def read_delta_marker_y(self, marker: int) -> float:
+        """读取 delta marker 的 Y 轴（与参考的幅度差 dB）"""
+        return self.query_number(f':CALC:DELT{marker}:Y?')
+
+    def read_xdb_bw(self) -> float:
+        """N dB 带宽测量：返回当前 marker 处的带宽 (Hz)，C/N 与占用带宽必用"""
+        return self.query_number(':CALC:BAND:RES?')
 
     def read_acp(self):
         """读取 ACPR 结果：返回 (主信道功率 dBm, 下邻道 dBc, 上邻道 dBc)"""
